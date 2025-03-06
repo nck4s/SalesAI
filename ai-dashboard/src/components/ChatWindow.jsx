@@ -10,30 +10,19 @@ const ChatWindow = () => {
 
     ws.onopen = () => console.log("✅ WebSocket Connected!");
     ws.onmessage = (event) => {
-      console.log("📩 Message received:", event.data);
-      try {
-        const data = JSON.parse(event.data);
-        setMessages((prev) => [...prev, data]);
-      } catch (error) {
-        console.error("🚨 Error parsing WebSocket message:", error);
-      }
+      const data = JSON.parse(event.data);
+      setMessages((prev) => [...prev, data]);
     };
     ws.onerror = (error) => console.error("🚨 WebSocket Error:", error);
-    ws.onclose = (event) => {
-      console.log("🔴 WebSocket closed:", event);
-      setTimeout(() => {
-        console.log("♻️ Reconnecting WebSocket...");
-        setSocket(new WebSocket("ws://localhost:8000/ws/chat/global/"));
-      }, 3000); // Попробуем переподключить через 3 секунды
-    };
+    ws.onclose = (event) => console.log("🔴 WebSocket closed:", event);
 
     setSocket(ws);
-
+    
     return () => ws.close();
   }, []);
 
   const handleSend = () => {
-    if (socket && socket.readyState === WebSocket.OPEN && input.trim()) {
+    if (socket && input.trim()) {
       socket.send(JSON.stringify({ message: input }));
       setInput("");
     }
