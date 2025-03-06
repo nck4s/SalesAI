@@ -6,13 +6,17 @@ const ChatWindow = () => {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    let ws = new WebSocket("ws://localhost:8000/ws/chat/global/");
+    const ws = new WebSocket("ws://localhost:8000/ws/chat/global/");
 
     ws.onopen = () => console.log("✅ WebSocket Connected!");
     ws.onmessage = (event) => {
       console.log("📩 Message received:", event.data);
-      const data = JSON.parse(event.data);
-      setMessages((prev) => [...prev, data]);
+      try {
+        const data = JSON.parse(event.data);
+        setMessages((prev) => [...prev, data]);
+      } catch (error) {
+        console.error("🚨 Error parsing WebSocket message:", error);
+      }
     };
     ws.onerror = (error) => console.error("🚨 WebSocket Error:", error);
     ws.onclose = (event) => {
@@ -20,15 +24,16 @@ const ChatWindow = () => {
       setTimeout(() => {
         console.log("♻️ Reconnecting WebSocket...");
         setSocket(new WebSocket("ws://localhost:8000/ws/chat/global/"));
-      }, 3000);
+      }, 3000); // Попробуем переподключить через 3 секунды
     };
 
     setSocket(ws);
+
     return () => ws.close();
   }, []);
 
   const handleSend = () => {
-    if (socket && input.trim()) {
+    if (socket && socket.readyState === WebSocket.OPEN && input.trim()) {
       socket.send(JSON.stringify({ message: input }));
       setInput("");
     }

@@ -1,32 +1,52 @@
+import os
+import json
+import logging
 import requests
+from dotenv import load_dotenv
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import json
+from .models import ChatMessage
 
-TOKEN = "your_telegram_bot_token"
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+
+load_dotenv()
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("❌ Ошибка: TELEGRAM_BOT_TOKEN не найден в .env!")
+
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+logger = logging.getLogger(__name__)
 
 @csrf_exempt
-def send_telegram_message(request):
+def telegram_webhook(request):
     if request.method == "POST":
-        data = json.loads(request.body)
-        chat_id = data.get("chat_id")
-        message = data.get("message")
+        try:
+            data = json.loads(request.body)
+            logger.info(f"📩 Получено сообщение от Telegram: {data}")
+            print(f"📩 Получено сообщение от Telegram: {data}")
 
-        if chat_id and message:
-            response = requests.post(
-                TELEGRAM_API_URL,
-                json={"chat_id": chat_id, "text": message}
-            )
-            return JsonResponse(response.json())
-    
+            chat_id = data["message"]["chat"]["id"]
+            message_text = data["message"]["text"]
+
+            response = requests.post(TELEGRAM_API_URL, json={"chat_id": chat_id, "text": f"Вы сказали: {message_text}"})
+            logger.info(f"📤 Ответ в Telegram: {response.json()}")
+            print(f"📤 Ответ в Telegram: {response.json()}")
+
+            return JsonResponse({"status": "ok"})
+        except Exception as e:
+            logger.error(f"❌ Ошибка обработки Telegram Webhook: {e}")
+            print(f"❌ Ошибка обработки Telegram Webhook: {e}")
+            return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid request"}, status=400)
 
-from django.http import JsonResponse
 
 def get_chats(request):
-    sample_chats = [
-        {"id": 1, "user": "Alice", "message": "Привет!"},
-        {"id": 2, "user": "Bob", "message": "Как дела?"}
-    ]
-    return JsonResponse(sample_chats, safe=False)
+    chats = ChatMessage.objects.order_by("-created_at").values("id", "user", "message")
+    return JsonResponse(list(chats), safe=False)
+
+def send_telegram_message(chat_id, text):
+    response = requests.post(TELEGRAM_API_URL, json={"chat_id": chat_id, "text": text})
+    return response.json()
